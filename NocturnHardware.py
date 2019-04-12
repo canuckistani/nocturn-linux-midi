@@ -11,19 +11,27 @@ import binascii
 
 DEBUG = False
 
-class NocturnHardware( object ):
-    
+class NocturnHardware(object):
+    #    Knobs Data:         64  ->  71
+    #    X Fader:            72
+    #    X Fader Touch:      83
+    #    Speed Dial:         74
+    #    Speed Dial Touch:   82
+    #    Knobs Touch:        96  ->  103
+    #    Top Button Row:     112 ->  119
+    #    Bottom Button Row:  120 ->  127
+
     vendorID = 0x1235
     productID = 0x000a
     initPackets=["b00000","28002b4a2c002e35","2a022c722e30","7f00"]
 
     ep = None
     ep2 = None
-        
 
-    def __init__( self ):
+
+    def __init__(self):
         dev = usb.core.find(idVendor=self.vendorID, idProduct=self.productID)
-            
+
         if dev is None:
             raise ValueError('Device not found')
             sys.exit()
@@ -33,10 +41,10 @@ class NocturnHardware( object ):
 
         self.ep = intf[1]
         self.ep2 = intf[0]
-        
+
         try:
             dev.set_configuration()
-            print "USB acquired: ", dev
+            print("USB acquired: ", dev)
         except usb.core.USBError as e:
             sys.exit('Something is wrong with your USB setup: \n' + str(e))
 
@@ -44,29 +52,35 @@ class NocturnHardware( object ):
         for packet in self.initPackets:
             self.ep.write(binascii.unhexlify(packet))
 
-    def write( self, packet ):
+    def write(self, packet):
         self.ep.write(packet)
-    
-    def read( self ):
+
+    def read(self):
         try:
             data = self.ep2.read(self.ep2.wMaxPacketSize,10)
             return data
         except usb.core.USBError:
             return
-    
-    def processedRead( self ):
+
+    def processedRead(self):
         data = self.read()
-        if data and DEBUG:
-            print data[1:3]
+        # if data:
+        #     return data
         return data[1:3] if data else None
 
     # Sets the LED ring mode for a specific LED ring
-    # possible modes: 0 = Start from MIN value, 1 = Start from MAX value, 2 = Start from MID value, single direction, 3 = Start from MID value, both directions, 4 = Single Value, 5 = Single Value inverted
+    # possible modes:
+    #   0 = Start from MIN value,
+    #   1 = Start from MAX value,
+    #   2 = Start from MID value, single direction,
+    #   3 = Start from MID value, both directions,
+    #   4 = Single Value,
+    #   5 = Single Value inverted
     # The center LED ring can't be set to a mode (or I haven't found out how)
     def setLEDRingMode (self, ring, mode):
         if ((ring > 8) | (ring < 0)):
             raise NameError("The LED ring needs to be between 0 and 8")
-        
+
         if ((mode < 0) | (mode > 5)):
             raise NameError("The mode needs to be between 0 and 5")
 
@@ -78,46 +92,54 @@ class NocturnHardware( object ):
     def setLEDRingValue (self, ring, value):
         if ((ring > 8) | (ring < 0)):
             raise NameError("The LED ring needs to be between 0 and 8")
-        
+
         if ((value < 0) | (value > 127)):
             raise NameError("The LED ring value needs to be between 0 and 127")
-        
+
         if ring == 8:
             self.write( chr(0x50) + chr(value))
         else:
             self.write(chr(0x40+ring) + chr(value))
-        
+
     # Turns a button LED on or off
     # button = 0-16
     # val = 0 or 1
     def setButton (self, but, val):
-        
         if ((but < 0) | (but > 15)):
             raise NameError("Button value needs to be between 0 and 15 (0x00 and 0x0F)")
-        
+
         if ((val == 0) | (val == 1)):
             self.write(chr(0x70 + but) + chr(val))
             return
-
         raise NameError("Button value needs to be 0 or 1")
-    
-    def clearAll ( self ):
-        for bb in range( 16 ):
-            self.setButton( bb, 0 )
-        for ll in range( 9 ):
-            self.setLEDRingMode( ll, 0 )
-            self.setLEDRingValue( ll, 0 )
+
+    def clearAll (self):
+        for bb in range(16):
+            self.setButton(bb, 0)
+        for ll in range(9):
+            self.setLEDRingMode(ll, 0)
+            self.setLEDRingValue(ll, 0)
+
+    # turn on a button momentarily
+    def momentary(button):
+        pass
+
+    # turn on a button until it is turned off.
+    def toggle():
+        pass
+
+
 
 if __name__ == "__main__":
     nh = NocturnHardware()
     nh.clearAll()
-    nh.setLEDRingMode(8, 0)
+    nh.setLEDRingMode(2, 0)
     #for ii in range(1):
     nh.setLEDRingValue(8, 127)
     try:
         while True:
             value = nh.processedRead()
             if value != None:
-                print nh.processedRead()
+                print(value)
     except KeyboardInterrupt as e:
         sys.exit(e)
